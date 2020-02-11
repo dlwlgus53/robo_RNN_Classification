@@ -1,8 +1,34 @@
 import torch
 import numpy as np
 import torch.nn as nn
+import pandas as pd
 import math
 
+def getIds(np_data, threshold):
+    ids = []
+    for n in range(np_data.shape[0]):
+        for i in range(np_data.shape[1]):
+            if np_data[n,i] > threshold:
+                ids.append(n)
+                break
+                
+    return ids
+
+df = pd.read_csv("robo_train.csv")
+np_data = np.asarray(df)
+
+threshold = 3.0
+
+ids = getIds(np_data, threshold)
+idss = [idx for idx in list(range(np_data.shape[0])) if idx not in ids]
+
+np_data = np_data[idss]
+
+np.savetxt("robo_train2.csv", np_data, delimiter=',')
+
+import pdb; pdb.set_trace()
+
+'''
 def cross_entropy(pred, soft_targets):
     return -soft_targets * torch.log(pred)
 
@@ -29,4 +55,4 @@ print(output1a)
 print(output1b)
 
 import pdb; pdb.set_trace()
-
+'''
