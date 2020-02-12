@@ -9,22 +9,33 @@ import math
 import sys
 import time
 
+import argparse
+
 from data import prepareData, batchify
 
+parser = argparse.ArgumentParser()
+
+parser.add_argument('--batch_size', type=int, default=1, help='')
+parser.add_argument('--hidden_size', type=int, default=3, help='')
+parser.add_argument('--savePath', type=str, required=True, help='')
+parser.add_argument('--max_epochs', type=int, default=1, help='')
+
+args = parser.parse_args()
+
 def get_batch(source, i):
-    return torch.tensor(source[i][0]).type(torch.float32),\
-           torch.tensor(source[i][1]).type(torch.float32),\
-           torch.tensor(source[i][2]).type(torch.LongTensor)
+    return torch.tensor(source[i][0]).type(torch.float32).to(device),\
+           torch.tensor(source[i][1]).type(torch.float32).to(device),\
+           torch.tensor(source[i][2]).type(torch.LongTensor).to(device)
 
 def train(rnn, input, mask, target, optimizer, criterion):
     loss_matrix = []    
 
-    hidden = rnn.initHidden()
+    hidden = rnn.initHidden().to(device)
     
     optimizer.zero_grad()
     
     input = input.unsqueeze(-1) # seq_len X 1
-    
+
     for t in range(input.size(0) - 1):
         output, hidden = rnn(input[t], hidden)
         loss = criterion(output, target.view(-1))
@@ -46,7 +57,7 @@ def train(rnn, input, mask, target, optimizer, criterion):
 def evaluate(rnn, input, mask, target, criterion):
     loss_matrix = []
 
-    hidden = rnn.initHidden()
+    hidden = rnn.initHidden().to(device)
 
     input = input.unsqueeze(-1)
     
@@ -71,6 +82,9 @@ def validate(rnn, batches):
     with torch.no_grad(): 
         for i in range(0, n_batches):
             input, mask, target = get_batch(batches,i)
+            
+            if (input.size(0)-1)==0: continue
+            
             output, loss = evaluate(rnn, input, mask, target, criterion)
             current_loss += loss
     
@@ -86,8 +100,8 @@ def timeSince(since):
 if __name__ == "__main__":
     # prepare data
     np_data, np_labels, np_vdata, np_vlabels = prepareData()
-    batch_size = 16 #TODO: batchsize and seq_len is the issue to be addressed
-    n_epoches = 5000    
+    batch_size = args.batch_size #TODO: batchsize and seq_len is the issue to be addressed
+    n_epoches = args.max_epochs 
 
     batches = batchify(np_data, batch_size, np_labels)
     vbatches = batchify(np_vdata, batch_size, np_vlabels) 
@@ -97,10 +111,10 @@ if __name__ == "__main__":
     # setup model
     from model import RNN
     input_size = 1
-    hidden_size = 3
+    hidden_size = args.hidden_size
     output_size = 2
     
-    rnn = RNN(input_size, hidden_size, output_size, batch_size)
+    rnn = RNN(input_size, hidden_size, output_size, batch_size).to(device)
 
     # define loss
     criterion = nn.NLLLoss(reduction='none')
@@ -114,14 +128,18 @@ if __name__ == "__main__":
     n_batches = len(batches)
 
     patience = 5    
-    savePath = "./model.pth"
+    savePath = args.savePath
     
-    for ei in range(n_epoches):
+    for ei in range(args.max_epochs):
         bad_counter = 0
         best_loss = -1.0
 
         for i in range(0, n_batches):
             input, mask, target = get_batch(batches,i)
+
+            if input.size(0) - 1 == 0: # single-day data
+                continue
+
             output, loss = train(rnn, input, mask, target, optimizer, criterion)
             current_loss += loss
 
@@ -130,11 +148,12 @@ if __name__ == "__main__":
                 top_n, top_i = output.topk(1)
                 correct = 'correct' if top_i[0].item() == target[0].item() else 'wrong'
                 print("%d %d%% (%s) %.4f %d / %s" % (i, i / n_batches * 100, timeSince(start), current_loss/print_every, top_i[0].item(), correct))
+                all_losses.append(current_loss / print_every)
 
                 current_loss=0
 
         valid_loss = validate(rnn, vbatches)
-        all_losses.append(current_loss / print_every)
+        print("valid loss : {}".format(valid_loss))
         
         if valid_loss < best_loss or best_loss < 0:
             bad_counter = 0
@@ -152,5 +171,5 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     plt.plot(all_losses)
-    plt.savefig("losses.png")
+    plt.savefig(args.savePath + ".png")
 

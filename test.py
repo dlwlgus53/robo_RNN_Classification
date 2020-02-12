@@ -2,8 +2,15 @@ import torch
 import numpy as np
 import torch.nn as nn
 import pandas as pd
+import argparse
 
 from model import RNN
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('--loadPath', type=str, required=True, help='')
+
+args = parser.parse_args()
 
 def getSeq_len(row):
     return np.count_nonzero(~np.isnan(row))
@@ -20,14 +27,14 @@ def getSample(np_data, np_labels, i):
 
     return row, label
 
-loadPath = "./model.pth"
-input_size = 1
-hidden_size = 3
-output_size = 2
+loadPath = args.loadPath
 batch_size = 1 # this is fixed to 1 at testing
 
 #rnn = RNN(input_size, hidden_size, output_size, batch_size)
-rnn = torch.load(loadPath)
+device = torch.device("cpu")
+
+rnn = torch.load(loadPath).to(device)
+hidden_size = rnn.state_dict()['i2h.weight'].shape[0]
 
 df = pd.read_csv("classification_test.csv")
 np_test = np.asarray(df)
@@ -35,12 +42,35 @@ np_test = np.asarray(df)
 np_data = np_test[:,:-1]
 np_labels = np_test[:,-1].reshape(-1,1)
 
-input, label = getSample(np_data, np_labels, 1)
-
 hidden = torch.zeros(batch_size, hidden_size)
 
-for t in range(input.size(0) - 1):
-    output, hidden = rnn(input[t], hidden)
+n_totals = np.zeros(np_data.shape[1])
+n_corrects = np.zeros(np_data.shape[1])
+
+for n in range(np_data.shape[0]):
+    input, label = getSample(np_data, np_labels, n)
+
+    for t in range(input.size(0) - 1):
+        output, hidden = rnn(input[t], hidden)
     
-    logit, pred = output.topk(1)
-    import pdb; pdb.set_trace()
+        logit, pred = output.topk(1)
+        n_totals[t] += 1
+
+        if pred.item() == label.item():
+            n_corrects[t] += 1
+
+accs = []
+for i in range(np_data.shape[1]):
+    if n_corrects[i] != 0:
+        accs.append(n_corrects[i] / n_totals[i])
+
+mystring = loadPath
+
+mylist = [str(num) for num in accs]
+
+mystring = mystring + ',' + ','.join(mylist) + '\n'
+
+with open("test.result", "a") as fp:
+    fp.write(mystring)
+
+
