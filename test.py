@@ -2,57 +2,45 @@ import torch
 import numpy as np
 import torch.nn as nn
 import pandas as pd
-import math
 
-def getIds(np_data, threshold):
-    ids = []
-    for n in range(np_data.shape[0]):
-        for i in range(np_data.shape[1]):
-            if np_data[n,i] > threshold:
-                ids.append(n)
-                break
-                
-    return ids
+from model import RNN
 
-df = pd.read_csv("robo_train.csv")
-np_data = np.asarray(df)
+def getSeq_len(row):
+    return np.count_nonzero(~np.isnan(row))
 
-threshold = 3.0
+def getSample(np_data, np_labels, i):
+    row = np_data[i]
+    label = np_labels[i]
+    
+    row = row[:getSeq_len(row)]
 
-ids = getIds(np_data, threshold)
-idss = [idx for idx in list(range(np_data.shape[0])) if idx not in ids]
+    row, label = torch.tensor(row).type(torch.float32), torch.tensor(label).type(torch.LongTensor)
+    row = row.view(-1, 1, 1)
+    label = label.view(1)
 
-np_data = np_data[idss]
+    return row, label
 
-np.savetxt("robo_train2.csv", np_data, delimiter=',')
+loadPath = "./model.pth"
+input_size = 1
+hidden_size = 3
+output_size = 2
+batch_size = 1 # this is fixed to 1 at testing
 
-import pdb; pdb.set_trace()
+#rnn = RNN(input_size, hidden_size, output_size, batch_size)
+rnn = torch.load(loadPath)
 
-'''
-def cross_entropy(pred, soft_targets):
-    return -soft_targets * torch.log(pred)
+df = pd.read_csv("classification_test.csv")
+np_test = np.asarray(df)
 
-def L2(pred, soft_targets):
-    return torch.pow(pred - soft_targets, 2)
+np_data = np_test[:,:-1]
+np_labels = np_test[:,-1].reshape(-1,1)
 
-labels = torch.tensor([[1,1,1,],[0,-1,-1],[1,1,-1]]).type(torch.float)
-mask = torch.tensor([[1,1,1,],[1,0,0],[1,1,0]]).type(torch.float)
+input, label = getSample(np_data, np_labels, 1)
 
-output1a = torch.tensor([[0.3,0.2,0.1],[0.5,0.3,0.3],[0.3,0.2,0.4]])
-output1b = torch.tensor([[0.3,0.2,0.1],[0.5,0.9,0.9],[0.3,0.2,0.9]])
+hidden = torch.zeros(batch_size, hidden_size)
 
-output2 = torch.tensor([[0.8,0.9,0.8],[0.4,0.9,0.9],[0.9,0.95,0.9]])
-
-loss = L2
-
-output1a = loss(output1a, labels)
-output1b = loss(output1b, labels)
-
-output1a = output1a * mask
-output1b = output1b * mask
-
-print(output1a)
-print(output1b)
-
-import pdb; pdb.set_trace()
-'''
+for t in range(input.size(0) - 1):
+    output, hidden = rnn(input[t], hidden)
+    
+    logit, pred = output.topk(1)
+    import pdb; pdb.set_trace()

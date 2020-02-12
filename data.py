@@ -70,39 +70,34 @@ def batchify(data, bsz, labels):
 
     return batches
 
+def prepareData():
+    df_train = pd.read_csv("classification_train.csv")
+    df_valid = pd.read_csv("classification_valid.csv")
+
+    np_train = np.asarray(df_train)
+    np_valid = np.asarray(df_valid)
+    
+    np_data = np_train[:,:-1]
+    np_labels = np_train[:,-1].reshape(-1,1)
+    
+    np_vdata = np_valid[:,:-1]
+    np_vlabels = np_valid[:,-1].reshape(-1,1)
+
+    return np_data, np_labels, np_vdata, np_vlabels
+
 def get_batch(source, i):
     return torch.tensor(source[i][0]).type(torch.float32),\
            torch.tensor(source[i][1]).type(torch.float32),\
            torch.tensor(source[i][2]).type(torch.LongTensor)
 
-def prepareData():
-    df_train = pd.read_csv("robo_train2.csv")
-    df_dummy = pd.read_csv("robo_dummy.csv")
+if __name__ == "__main__":
+    prepareData()
 
-    np_train = np.asarray(df_train)
-    np_dummy = np.asarray(df_dummy)
-
-    ones = np.ones((np_train.shape[0],1))
-    zeros = np.zeros((np_dummy.shape[0],1))
-
-    # concatconcat
-    np_data = np.vstack([np_train, np_dummy])
-    np_labels = np.vstack([ones, zeros])
-
-    # shuffle
-    ids = list(range(np_data.shape[0]))
-    np.random.seed(11)
-    np.random.shuffle(ids)
-
-    np_data = np_data[ids]
-    np_labels = np_labels[ids]
-
-    return np_data, np_labels
-
+'''
 if __name__ == "__main__":
     # prepare data
     np_data, np_labels = prepareData()
-    batch_size = 32 #TODO: batchsize and seq_len is the issue to be addressed
+    batch_size = 16 #TODO: batchsize and seq_len is the issue to be addressed
     i = 5
 
     batches = batchify(np_data, batch_size, np_labels)
@@ -125,13 +120,14 @@ if __name__ == "__main__":
 def train(rnn, input, mask, target, optimizer, criterion):
     loss_matrix = []    
 
-    hidden = rnn.initHidden() 
+    hidden = rnn.initHidden()
     
     optimizer.zero_grad()
     
     input = input.unsqueeze(-1) # seq_len X 1
     
     for t in range(input.size(0)):
+        import pdb; pdb.set_trace()
         output, hidden = rnn(input[t], hidden)
         loss = criterion(output, target.view(-1))
         loss_matrix.append(loss.view(1))
@@ -145,8 +141,8 @@ def train(rnn, input, mask, target, optimizer, criterion):
 
     return output, loss.item()
 
-print_every = 500
-plot_every = 1000
+print_every = 100
+plot_every = 100
 current_loss = 0
 all_losses = []
 
@@ -181,4 +177,4 @@ import matplotlib.pyplot as plt
 
 plt.plot(all_losses)
 plt.savefig("losses.png")
-
+'''
