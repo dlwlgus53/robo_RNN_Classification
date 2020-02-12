@@ -34,7 +34,8 @@ batch_size = 1 # this is fixed to 1 at testing
 device = torch.device("cpu")
 
 rnn = torch.load(loadPath).to(device)
-hidden_size = rnn.state_dict()['i2h.weight'].shape[0]
+#import pdb; pdb.set_trace()
+hidden_size = rnn.state_dict()['rnn.weight_hh_l0'].shape[1]
 
 df = pd.read_csv("classification_test.csv")
 np_test = np.asarray(df)
@@ -42,15 +43,17 @@ np_test = np.asarray(df)
 np_data = np_test[:,:-1]
 np_labels = np_test[:,-1].reshape(-1,1)
 
-hidden = torch.zeros(batch_size, hidden_size)
+hidden = torch.zeros(2,1,batch_size, hidden_size)
 
 n_totals = np.zeros(np_data.shape[1])
 n_corrects = np.zeros(np_data.shape[1])
 
 for n in range(np_data.shape[0]):
     input, label = getSample(np_data, np_labels, n)
+    #input = input.unsqueeze(-1)
 
     for t in range(input.size(0) - 1):
+
         output, hidden = rnn(input[t], hidden)
     
         logit, pred = output.topk(1)

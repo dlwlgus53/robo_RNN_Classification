@@ -38,7 +38,7 @@ def train(rnn, input, mask, target, optimizer, criterion):
 
     for t in range(input.size(0) - 1):
         output, hidden = rnn(input[t], hidden)
-        loss = criterion(output, target.view(-1))
+        loss = criterion(output.view(args.batch_size,-1), target.view(-1))
         loss_matrix.append(loss.view(1,-1))
 
     loss_matrix = torch.cat(loss_matrix, dim=0)
@@ -63,7 +63,7 @@ def evaluate(rnn, input, mask, target, criterion):
     
     for t in range(input.size(0) - 1):
         output, hidden = rnn(input[t], hidden)
-        loss = criterion(output, target.view(-1))
+        loss = criterion(output.view(args.batch_size,-1), target.view(-1))
         loss_matrix.append(loss.view(1,-1))
 
     loss_matrix = torch.cat(loss_matrix, dim=0)
@@ -146,8 +146,8 @@ if __name__ == "__main__":
             # print iter number, loss, prediction, and target
             if i % print_every == (print_every - 1):
                 top_n, top_i = output.topk(1)
-                correct = 'correct' if top_i[0].item() == target[0].item() else 'wrong'
-                print("%d %d%% (%s) %.4f %d / %s" % (i, i / n_batches * 100, timeSince(start), current_loss/print_every, top_i[0].item(), correct))
+                #correct = 'correct' if top_i[0].item() == target[0].item() else 'wrong'
+                print("%d %d%% (%s) %.4f" % (i, i / n_batches * 100, timeSince(start), current_loss/print_every))
                 all_losses.append(current_loss / print_every)
 
                 current_loss=0
