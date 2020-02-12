@@ -87,11 +87,12 @@ def prepareData():
 if __name__ == "__main__":
     # prepare data
     np_data, np_labels = prepareData()
-    batch_size = 1 #TODO: batchsize and seq_len is the issue to be addressed
+    batch_size = 4 #TODO: batchsize and seq_len is the issue to be addressed
     i = 5
 
     batches = batchify(np_data, batch_size, np_labels)
-   
+  
+    import pdb; pdb.set_trace() 
     device = torch.device("cuda")     
 
     # setup model
