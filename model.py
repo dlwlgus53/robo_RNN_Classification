@@ -6,10 +6,11 @@ import torch
 import torch.nn as nn
 
 class RNN(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, hidden_size, output_size, batch_size):
         super(RNN, self).__init__()
 
         self.hidden_size = hidden_size
+        self.batch_size = batch_size
 
         self.i2h = nn.Linear(input_size + hidden_size, hidden_size)
         self.i2o = nn.Linear(input_size + hidden_size, output_size)
@@ -23,5 +24,5 @@ class RNN(nn.Module):
         return output, hidden
 
     def initHidden(self):
-        return torch.zeros(1, self.hidden_size)
+        return torch.zeros(self.batch_size, self.hidden_size)
 

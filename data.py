@@ -38,6 +38,16 @@ def trim_batch(batch):
     batch = batch[:,:max_seq_len]
     return batch
 
+def addPadding(data):
+    '''
+    args: 2D npndarray with nans
+    returns npndarray with nans padded with 0's
+    '''
+    for n in range(data.shape[0]):
+        for i in range(data.shape[1]):
+            if np.isnan(data[n,i]): data[n,i] = 0
+    return data
+
 def batchify(data, bsz, labels):
     batches = []
     
@@ -50,6 +60,11 @@ def batchify(data, bsz, labels):
 
         batch = trim_batch(batch)
         mask = getMask(batch)
+        
+        batch = addPadding(batch)
+
+        batch = batch.transpose() # for inputting to RNN
+        mask = mask.transpose()
 
         batches.append([batch, mask, target])
 
@@ -87,12 +102,11 @@ def prepareData():
 if __name__ == "__main__":
     # prepare data
     np_data, np_labels = prepareData()
-    batch_size = 4 #TODO: batchsize and seq_len is the issue to be addressed
+    batch_size = 32 #TODO: batchsize and seq_len is the issue to be addressed
     i = 5
 
     batches = batchify(np_data, batch_size, np_labels)
   
-    import pdb; pdb.set_trace() 
     device = torch.device("cuda")     
 
     # setup model
@@ -101,7 +115,7 @@ if __name__ == "__main__":
     hidden_size = 3
     output_size = 2
     
-    rnn = RNN(input_size, hidden_size, output_size)
+    rnn = RNN(input_size, hidden_size, output_size, batch_size)
 
     # define loss
     criterion = nn.CrossEntropyLoss()
@@ -115,7 +129,7 @@ def train(rnn, input, mask, target, optimizer, criterion):
     
     optimizer.zero_grad()
     
-    input = input.view(-1,1,1) # seq_len X 1
+    input = input.unsqueeze(-1) # seq_len X 1
     
     for t in range(input.size(0)):
         output, hidden = rnn(input[t], hidden)
@@ -154,8 +168,8 @@ for i in range(0, n_batches):
     # print iter number, loss, prediction, and target
     if i % print_every == (print_every - 1):
         top_n, top_i = output.topk(1)
-        correct = 'correct' if top_i == target.item() else 'wrong'
-        print("%d %d%% (%s) %.4f %d / %s" % (i, i / n_batches * 100, timeSince(start), loss, top_i, correct))
+        correct = 'correct' if top_i[0].item() == target[0].item() else 'wrong'
+        print("%d %d%% (%s) %.4f %d / %s" % (i, i / n_batches * 100, timeSince(start), loss, top_i[0].item(), correct))
 
     if i % plot_every == (plot_every - 1):
         all_losses.append(current_loss / plot_every)
