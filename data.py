@@ -22,7 +22,7 @@ def getMask(batch):
     '''
     return (~np.isnan(batch)).astype(np.int32)
 
-def trim_batch(batch):
+def trimBatch(batch):
     '''
     args: npndarray of a batch (bsz, n_features)
     returns: trimmed npndarray of a batch.
@@ -32,7 +32,7 @@ def trim_batch(batch):
         max_seq_len = max(max_seq_len, getSeq_len(batch[n]))
 
     if max_seq_len == 0:
-        print("error in trim_batch()")
+        print("error in trimBatch()")
         sys.exit(-1)
 
     batch = batch[:,:max_seq_len]
@@ -52,13 +52,13 @@ def batchify(data, bsz, labels):
     batches = []
     
     n_samples = data.shape[0]
-    for n in range(0,n_samples,bsz):
+    for n in range(0, n_samples, bsz):
         if n+bsz > n_samples: #discard remainder #TODO: use remainders somehow
             break
         batch = data[n:n+bsz]
         target = labels[n:n+bsz]
 
-        batch = trim_batch(batch)
+        batch = trimBatch(batch)
         mask = getMask(batch)
         
         batch = addPadding(batch)
@@ -71,8 +71,8 @@ def batchify(data, bsz, labels):
     return batches
 
 def prepareData():
-    df_train = pd.read_csv("classification_train.csv")
-    df_valid = pd.read_csv("classification_valid.csv")
+    df_train = pd.read_csv("./data/classification_train.csv")
+    df_valid = pd.read_csv("./data/classification_valid.csv")
 
     np_train = np.asarray(df_train)
     np_valid = np.asarray(df_valid)

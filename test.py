@@ -37,7 +37,7 @@ rnn = torch.load(loadPath).to(device)
 #import pdb; pdb.set_trace()
 hidden_size = rnn.state_dict()['rnn.weight_hh_l0'].shape[1]
 
-df = pd.read_csv("classification_test.csv")
+df = pd.read_csv("./data/classification_test.csv")
 np_test = np.asarray(df)
 
 np_data = np_test[:,:-1]
@@ -46,7 +46,11 @@ np_labels = np_test[:,-1].reshape(-1,1)
 hidden = torch.zeros(2,1,batch_size, hidden_size)
 
 n_totals = np.zeros(np_data.shape[1])
-n_corrects = np.zeros(np_data.shape[1])
+#n_corrects = np.zeros(np_data.shape[1])
+
+n_preds = np.zeros((2, np_data.shape[1]))
+n_targets = np.zeros((2, np_data.shape[1]))
+n_corrects = np.zeros((2, np_data.shape[1]))
 
 for n in range(np_data.shape[0]):
     input, label = getSample(np_data, np_labels, n)
@@ -57,23 +61,45 @@ for n in range(np_data.shape[0]):
         output, hidden = rnn(input[t], hidden)
     
         logit, pred = output.topk(1)
+        
         n_totals[t] += 1
-
+        n_preds[pred.item(),t] += 1
+        n_targets[label.item(),t] += 1
+        
         if pred.item() == label.item():
-            n_corrects[t] += 1
+            n_corrects[pred.item(),t] += 1
 
 accs = []
-for i in range(np_data.shape[1]):
-    if n_corrects[i] != 0:
-        accs.append(n_corrects[i] / n_totals[i])
+precs = []
+recs = []
 
+for i in range(np_data.shape[1]):
+    if n_totals[i] != 0:
+        accs.append(np.sum(n_corrects[:,i]) / n_totals[i])
+
+for i in range(np_data.shape[1]):
+    if n_preds[1, i] != 0:
+        precs.append(n_corrects[1,i] / n_preds[1,i])
+    else:
+        precs.append(-1.0)
+
+for i in range(np_data.shape[1]):
+    if n_targets[1, i] != 0:
+        recs.append(n_corrects[1,i] / n_targets[1,i])
+    else:
+        recs.append(-1.0)
+ 
 mystring = loadPath
 
-mylist = [str(num) for num in accs]
+acclist = [str(num) for num in accs]
+preclist = [str(num) for num in precs]
+reclist = [str(num) for num in recs]
 
-mystring = mystring + ',' + ','.join(mylist) + '\n'
+accString = mystring + ',' + 'accuracy' + ',' + ','.join(acclist) + '\n'
+precString = mystring + ',' + 'precision' + ',' + ','.join(preclist) + '\n'
+recString = mystring + ',' + 'recall' + ',' + ','.join(reclist) + '\n'
 
 with open("test.result", "a") as fp:
-    fp.write(mystring)
-
-
+    fp.write(accString)
+    fp.write(precString)
+    fp.write(recString)

@@ -22,7 +22,7 @@ parser.add_argument('--max_epochs', type=int, default=1, help='')
 
 args = parser.parse_args()
 
-def get_batch(source, i):
+def getBatch(source, i):
     return torch.tensor(source[i][0]).type(torch.float32).to(device),\
            torch.tensor(source[i][1]).type(torch.float32).to(device),\
            torch.tensor(source[i][2]).type(torch.LongTensor).to(device)
@@ -81,7 +81,7 @@ def validate(rnn, batches):
     rnn.eval()
     with torch.no_grad(): 
         for i in range(0, n_batches):
-            input, mask, target = get_batch(batches,i)
+            input, mask, target = getBatch(batches,i)
             
             if (input.size(0)-1)==0: continue
             
@@ -135,7 +135,7 @@ if __name__ == "__main__":
         best_loss = -1.0
 
         for i in range(0, n_batches):
-            input, mask, target = get_batch(batches,i)
+            input, mask, target = getBatch(batches,i)
 
             if input.size(0) - 1 == 0: # single-day data
                 continue
