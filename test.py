@@ -50,9 +50,14 @@ batch_size = 1 # this is fixed to 1 at testing
 device = torch.device("cpu")
 
 rnn = torch.load(loadPath).to(device)
-#import pdb; pdb.set_trace()
-hidden_size = rnn.state_dict()['rnn.weight_hh_l0'].shape[1]
-hidden = torch.zeros((2,1,1,hidden_size))
+
+if (str(rnn).split('('))[0] == 'NaiveRNN':
+    hidden_size = rnn.state_dict()['i2h.weight'].shape[0]
+    hidden = torch.zeros(1,hidden_size)
+else:
+    hidden_size = rnn.state_dict()['rnn.weight_hh_l0'].shape[1]
+    hidden = torch.zeros((2,1,1,hidden_size))
+
 
 df = pd.read_csv("./data/classification_test.csv")
 np_test = np.asarray(df)

@@ -32,7 +32,8 @@ def getBatch(source, i):
            torch.tensor(source[i][2]).type(torch.LongTensor).to(device)
 
 def train(rnn, input, mask, target, optimizer, criterion):
-    loss_matrix = []    
+
+    loss_matrix = []
 
     hidden = rnn.initHidden().to(device)
     
@@ -113,12 +114,13 @@ if __name__ == "__main__":
     device = torch.device("cuda")     
 
     # setup model
-    from model import RNN
+    from model import RNN, NaiveRNN
     input_size = 2
     hidden_size = args.hidden_size
     output_size = 2
     
     rnn = RNN(input_size, hidden_size, output_size, batch_size).to(device)
+    #rnn = NaiveRNN(input_size, hidden_size, output_size, batch_size).to(device)
 
     # define loss
     criterion = nn.NLLLoss(reduction='none')
