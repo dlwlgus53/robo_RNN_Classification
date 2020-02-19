@@ -1,3 +1,7 @@
+'''
+adopted from pytorch.org (Classifying names with a character-level RNN-Sean Robertson)
+'''
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -15,8 +19,8 @@ from data import prepareData, batchify
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--batch_size', type=int, default=1, help='')
-parser.add_argument('--hidden_size', type=int, default=3, help='')
+parser.add_argument('--batch_size', type=int, default=8, help='')
+parser.add_argument('--hidden_size', type=int, default=8, help='')
 parser.add_argument('--savePath', type=str, required=True, help='')
 parser.add_argument('--max_epochs', type=int, default=1, help='')
 
@@ -34,7 +38,7 @@ def train(rnn, input, mask, target, optimizer, criterion):
     
     optimizer.zero_grad()
     
-    input = input.unsqueeze(-1) # seq_len X 1
+    #input = input.unsqueeze(-1) # depricated after addDelta()
 
     for t in range(input.size(0) - 1):
         output, hidden = rnn(input[t], hidden)
@@ -59,7 +63,7 @@ def evaluate(rnn, input, mask, target, criterion):
 
     hidden = rnn.initHidden().to(device)
 
-    input = input.unsqueeze(-1)
+    #input = input.unsqueeze(-1) #deprecated after using addDelta()
     
     for t in range(input.size(0) - 1):
         output, hidden = rnn(input[t], hidden)
@@ -110,7 +114,7 @@ if __name__ == "__main__":
 
     # setup model
     from model import RNN
-    input_size = 1
+    input_size = 2
     hidden_size = args.hidden_size
     output_size = 2
     
@@ -134,7 +138,7 @@ if __name__ == "__main__":
         bad_counter = 0
         best_loss = -1.0
 
-        for i in range(0, n_batches):
+        for i in range(0, n_batches): #TODO for debugging
             input, mask, target = getBatch(batches,i)
 
             if input.size(0) - 1 == 0: # single-day data
@@ -144,10 +148,10 @@ if __name__ == "__main__":
             current_loss += loss
 
             # print iter number, loss, prediction, and target
-            if i % print_every == (print_every - 1):
+            if (i+1) % print_every == 0:
                 top_n, top_i = output.topk(1)
                 #correct = 'correct' if top_i[0].item() == target[0].item() else 'wrong'
-                print("%d %d%% (%s) %.4f" % (i, i / n_batches * 100, timeSince(start), current_loss/print_every))
+                print("%d %d%% (%s) %.4f" % (i+1, (i+1) / n_batches * 100, timeSince(start), current_loss/print_every))
                 all_losses.append(current_loss / print_every)
 
                 current_loss=0

@@ -12,6 +12,19 @@ parser.add_argument('--loadPath', type=str, required=True, help='')
 
 args = parser.parse_args()
 
+def addDelta(row):
+    p_row = np.zeros(len(row))
+
+    for i in range(1,len(row)):
+        p_row[i] = row[i] - row[i-1]
+  
+    row = row.reshape(-1,1)
+    p_row = p_row.reshape(-1,1)
+
+    merged = np.hstack([row, p_row])
+
+    return merged
+
 def getSeq_len(row):
     return np.count_nonzero(~np.isnan(row))
 
@@ -21,11 +34,14 @@ def getSample(np_data, np_labels, i):
     
     row = row[:getSeq_len(row)]
 
-    row, label = torch.tensor(row).type(torch.float32), torch.tensor(label).type(torch.LongTensor)
-    row = row.view(-1, 1, 1)
+    sample = addDelta(row)
+    #import pdb; pdb.set_trace()
+
+    sample, label = torch.tensor(sample).type(torch.float32), torch.tensor(label).type(torch.LongTensor)
+    sample = sample.view(-1, 1, 2)
     label = label.view(1)
 
-    return row, label
+    return sample, label
 
 loadPath = args.loadPath
 batch_size = 1 # this is fixed to 1 at testing
@@ -36,14 +52,13 @@ device = torch.device("cpu")
 rnn = torch.load(loadPath).to(device)
 #import pdb; pdb.set_trace()
 hidden_size = rnn.state_dict()['rnn.weight_hh_l0'].shape[1]
+hidden = torch.zeros((2,1,1,hidden_size))
 
 df = pd.read_csv("./data/classification_test.csv")
 np_test = np.asarray(df)
 
 np_data = np_test[:,:-1]
 np_labels = np_test[:,-1].reshape(-1,1)
-
-hidden = torch.zeros(2,1,batch_size, hidden_size)
 
 n_totals = np.zeros(np_data.shape[1])
 #n_corrects = np.zeros(np_data.shape[1])
@@ -53,6 +68,8 @@ n_targets = np.zeros((2, np_data.shape[1]))
 n_corrects = np.zeros((2, np_data.shape[1]))
 
 for n in range(np_data.shape[0]):
+    print(n)
+    
     input, label = getSample(np_data, np_labels, n)
     #input = input.unsqueeze(-1)
 
@@ -61,7 +78,7 @@ for n in range(np_data.shape[0]):
         output, hidden = rnn(input[t], hidden)
     
         logit, pred = output.topk(1)
-        
+       
         n_totals[t] += 1
         n_preds[pred.item(),t] += 1
         n_targets[label.item(),t] += 1

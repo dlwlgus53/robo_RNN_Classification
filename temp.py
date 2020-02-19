@@ -40,7 +40,6 @@ def addDelta(batch):
 
 batch_out = addDelta(batch_in)
 
-
 import pdb; pdb.set_trace()
 
 

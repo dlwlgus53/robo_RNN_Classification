@@ -1,3 +1,7 @@
+'''
+adopted from pytorch.org (Classifying names with a character-level RNN-Sean Robertson)
+'''
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -48,6 +52,25 @@ def addPadding(data):
             if np.isnan(data[n,i]): data[n,i] = 0
     return data
 
+def getDelta(col_prev, col): # helper for addDelta()
+    delta = (col - col_prev).reshape(-1,1)
+
+    return np.hstack([col, delta])
+
+def addDelta(batch):
+    timesteps = []
+    # treat first column
+    delta = np.zeros((batch.shape[0],2))
+    timesteps.append(delta)
+
+    # tread the rest
+    for i in range(1, batch.shape[1]):
+        timesteps.append(getDelta(batch[:,i-1].reshape(-1,1), batch[:,i].reshape(-1,1)))
+
+    samples = np.stack(timesteps)
+
+    return samples
+
 def batchify(data, bsz, labels):
     batches = []
     
@@ -63,7 +86,7 @@ def batchify(data, bsz, labels):
         
         batch = addPadding(batch)
 
-        batch = batch.transpose() # for inputting to RNN
+        batch = addDelta(batch)
         mask = mask.transpose()
 
         batches.append([batch, mask, target])
@@ -85,3 +108,7 @@ def prepareData():
 
     return np_data, np_labels, np_vdata, np_vlabels
 
+if __name__ == "__main__":
+    a, b, c, d = prepareData()
+
+    batches = batchify(a, 4, b)
