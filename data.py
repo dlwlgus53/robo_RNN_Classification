@@ -94,9 +94,8 @@ def batchify(data, bsz, labels):
     return batches
 
 def prepareData():
-    df_train = pd.read_csv("./data/classification_train.csv")
-    df_valid = pd.read_csv("./data/classification_valid.csv")
-
+    df_train = pd.read_csv("../data/dummy/classification_train.csv")
+    df_valid = pd.read_csv("../data/dummy/classification_test.csv")
     np_train = np.asarray(df_train)
     np_valid = np.asarray(df_valid)
     
@@ -112,3 +111,4 @@ if __name__ == "__main__":
     a, b, c, d = prepareData()
 
     batches = batchify(a, 4, b)
+    print(batches[0])

@@ -34,8 +34,9 @@ def getBatch(source, i):
 def train(rnn, input, mask, target, optimizer, criterion):
 
     loss_matrix = []
-
+    #import pdb; pdb.set_trace()
     hidden = rnn.initHidden().to(device)
+    hidden = (hidden[0],hidden[1])
     
     optimizer.zero_grad()
     
@@ -126,7 +127,7 @@ if __name__ == "__main__":
     criterion = nn.NLLLoss(reduction='none')
     optimizer = optim.RMSprop(rnn.parameters())
     
-    print_every = 100
+    print_every = 100 #print every minibatch
     current_loss = 0
     all_losses = []
 
@@ -153,10 +154,14 @@ if __name__ == "__main__":
             if (i+1) % print_every == 0:
                 top_n, top_i = output.topk(1)
                 #correct = 'correct' if top_i[0].item() == target[0].item() else 'wrong'
+                # print minibatch, ongoing pecentage, time, currnet loss for minibatch
                 print("%d %d%% (%s) %.4f" % (i+1, (i+1) / n_batches * 100, timeSince(start), current_loss/print_every))
                 all_losses.append(current_loss / print_every)
 
                 current_loss=0
+
+
+        '''after one epoch, Test start'''
 
         valid_loss = validate(rnn, vbatches)
         print("valid loss : {}".format(valid_loss))

@@ -40,8 +40,9 @@ class RNN(nn.Module):
     def forward(self, input, hidden):
         #import pdb; pdb.set_trace()
         input = input.unsqueeze(0)
-        
-        output, hidden = self.rnn(input, hidden)        
+        #TODO
+        output, hidden = self.rnn(input, hidden)
+                
         output = self.fc(output)
         output = self.softmax(output)
 
