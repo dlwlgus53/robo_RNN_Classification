@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--batch_size', type=int, default=8, help='')
 parser.add_argument('--hidden_size', type=int, default=8, help='')
 parser.add_argument('--savePath', type=str, required=True, help='')
-parser.add_argument('--max_epochs', type=int, default=1, help='')
+parser.add_argument('--max_epochs', type=int, default=10, help='')
 
 args = parser.parse_args()
 
@@ -32,9 +32,8 @@ def getBatch(source, i):
            torch.tensor(source[i][2]).type(torch.LongTensor).to(device)
 
 def train(rnn, input, mask, target, optimizer, criterion):
-
+    rnn = rnn.train()
     loss_matrix = []
-    #import pdb; pdb.set_trace()
     hidden = rnn.initHidden().to(device)
     hidden = (hidden[0],hidden[1])
     
@@ -61,9 +60,11 @@ def train(rnn, input, mask, target, optimizer, criterion):
     return output, loss.item()
 
 def evaluate(rnn, input, mask, target, criterion):
+    rnn = rnn.eval()
     loss_matrix = []
 
     hidden = rnn.initHidden().to(device)
+    hidden = (hidden[0], hidden[1]) #???
 
     #input = input.unsqueeze(-1) #deprecated after using addDelta()
     
@@ -75,14 +76,17 @@ def evaluate(rnn, input, mask, target, criterion):
     loss_matrix = torch.cat(loss_matrix, dim=0)
     mask = mask[:(input.size(0) - 1), :]
     
-    masked = loss_matrix * mask
-    
+    masked = loss_matrix * mask #daylen * batch_size
+    lossPerDay = torch.sum(masked, dim = 1)/torch.sum(mask, dim=1 ) #1*daylen
     loss = torch.sum(masked) / torch.sum(mask)
-
-    return output, loss.item()
+    # retrun masked raw loss matrix for checking loss per day
+    # return total oss
+    return lossPerDay, loss.item()
 
 def validate(rnn, batches):
     current_loss = 0
+    lossPerDays = []
+    lossPerDays_avg = []
     n_batches = len(batches)
     rnn.eval()
     with torch.no_grad(): 
@@ -91,10 +95,18 @@ def validate(rnn, batches):
             
             if (input.size(0)-1)==0: continue
             
-            output, loss = evaluate(rnn, input, mask, target, criterion)
+            lossPerDay, loss = evaluate(rnn, input, mask, target, criterion)
+            #import pdb; pdb.set_trace()
+
+            lossPerDays.append(lossPerDay[:7]) #n_batches * 10
             current_loss += loss
-    
-    return current_loss / n_batches
+            #lossPerDay += torch.sum(lossPerDay)
+        #import pdb; pdb.set_trace()
+        lossPerDays = torch.stack(lossPerDays)
+        lossPerDays_avg = lossPerDays.sum(dim =0)
+        
+        lossPerDays_avg = lossPerDays_avg/n_batches
+    return lossPerDays_avg, current_loss / n_batches, 
 
 def timeSince(since):
     now = time.time()
@@ -151,6 +163,8 @@ if __name__ == "__main__":
             current_loss += loss
 
             # print iter number, loss, prediction, and target
+            #if i ==102:
+            #    break
             if (i+1) % print_every == 0:
                 top_n, top_i = output.topk(1)
                 #correct = 'correct' if top_i[0].item() == target[0].item() else 'wrong'
@@ -163,9 +177,9 @@ if __name__ == "__main__":
 
         '''after one epoch, Test start'''
 
-        valid_loss = validate(rnn, vbatches)
+        lossPerDays, valid_loss = validate(rnn, vbatches)
         print("valid loss : {}".format(valid_loss))
-        
+        print(lossPerDays)
         if valid_loss < best_loss or best_loss < 0:
             bad_counter = 0
             torch.save(rnn, savePath)

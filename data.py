@@ -13,6 +13,23 @@ import math
 import sys
 import time
 
+def remove_wrong_data(data):
+    cleans = []
+    for n in range(data.shape[0]):
+        if np.isnan(data[n,0:2]).any():
+            continue
+        cleans.append(data[n,:-2])
+    return np.vstack(cleans)
+
+def remove_short_data(data):
+    enough = []
+    #import pdb; pdb.set_trace()
+    for n in range(data.shape[0]):
+        if(np.count_nonzero(~np.isnan(data[n])) < 15): #TODO hardcoding
+            continue
+        enough.append(data[n])
+    return np.vstack(enough)
+    
 def getSeq_len(row):
     '''
     returns: count of non-nans (integer)
@@ -99,12 +116,16 @@ def prepareData():
     np_train = np.asarray(df_train)
     np_valid = np.asarray(df_valid)
     
+    np_train = remove_short_data(np_train)
+    np_valid = remove_short_data(np_valid)
+
     np_data = np_train[:,:-1]
     np_labels = np_train[:,-1].reshape(-1,1)
     
     np_vdata = np_valid[:,:-1]
     np_vlabels = np_valid[:,-1].reshape(-1,1)
 
+    
     return np_data, np_labels, np_vdata, np_vlabels
 
 if __name__ == "__main__":
