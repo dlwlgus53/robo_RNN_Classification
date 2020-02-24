@@ -38,8 +38,9 @@ def getSeq_len(row):
     return np.count_nonzero(~np.isnan(row))
 
 def getMask(batch):
+    
     '''
-    returns: boolean array indicating whether nans
+    returns: boolean array indicating whether nans  
     '''
     return (~np.isnan(batch)).astype(np.int32)
 

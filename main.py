@@ -148,6 +148,11 @@ if __name__ == "__main__":
 
     patience = 5    
     savePath = args.savePath
+   
+
+    train_path = ""
+    train_iter = (train_path, batch_size)
+
     
     for ei in range(args.max_epochs):
         bad_counter = 0
