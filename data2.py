@@ -14,16 +14,24 @@ class FSIterator:
 
     def __next__(self):
         bat_seq = []
-        end_of_data = 0
+        touch_end = 0
+
         for i in range(self.batch_size):
             seq = self.fp.readline()
+            if touch_end:
+                raise StopIteration
+
             if seq == "":
+                touch_end = 1
+                
+                '''
                 if self.just_epoch:
                     end_of_data = 1
                     if self.batch_size==1:
                         raise StopIteration
                     else:
                         break
+                '''
                 self.reset()
                 seq = self.fp.readline() # read the first line
 
@@ -32,7 +40,7 @@ class FSIterator:
 
         x_data, y_data, mask_data = self.prepare_data(np.array(bat_seq))
 
-        return x_data, y_data, mask_data, end_of_data
+        return x_data, y_data, mask_data, touch_end
 
     def getSeq_len(self,row):
         '''                                                                                                                                 
@@ -86,7 +94,7 @@ class FSIterator:
 
         #y_data = (seq_delta[:,1:] > 0)*1.0 # the diff
         
-        mask_data = np.stack([seq_mask.transpose(1,0)])
+        mask_data = np.stack(seq_mask.transpose(1,0))
         '''
         x_data : daymaxlen-2, batch, inputdim(=2)
         y_data : 1 * batch * 1

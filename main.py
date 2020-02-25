@@ -15,21 +15,17 @@ import time
 
 import argparse
 
-from data import prepareData, batchify
+#from data import prepareData, batchify
+from data2 import FSIterator
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--batch_size', type=int, default=8, help='')
 parser.add_argument('--hidden_size', type=int, default=8, help='')
 parser.add_argument('--savePath', type=str, required=True, help='')
-parser.add_argument('--max_epochs', type=int, default=10, help='')
+parser.add_argument('--max_epochs', type=int, default=2, help='')
 
 args = parser.parse_args()
-
-def getBatch(source, i):
-    return torch.tensor(source[i][0]).type(torch.float32).to(device),\
-           torch.tensor(source[i][1]).type(torch.float32).to(device),\
-           torch.tensor(source[i][2]).type(torch.LongTensor).to(device)
 
 def train(rnn, input, mask, target, optimizer, criterion):
     rnn = rnn.train()
@@ -40,12 +36,15 @@ def train(rnn, input, mask, target, optimizer, criterion):
     optimizer.zero_grad()
     
     #input = input.unsqueeze(-1) # depricated after addDelta()
-
+    
     for t in range(input.size(0) - 1):
         output, hidden = rnn(input[t], hidden)
         loss = criterion(output.view(args.batch_size,-1), target.view(-1))
         loss_matrix.append(loss.view(1,-1))
+    
 
+    #output, hidden = rnn(input, hidden)
+    
     loss_matrix = torch.cat(loss_matrix, dim=0)
     mask = mask[:(input.size(0) - 1), :]
     
@@ -68,7 +67,7 @@ def evaluate(rnn, input, mask, target, criterion):
 
     #input = input.unsqueeze(-1) #deprecated after using addDelta()
     
-    for t in range(input.size(0) - 1):
+    for t in range(input.size(0)- 1):
         output, hidden = rnn(input[t], hidden)
         loss = criterion(output.view(args.batch_size,-1), target.view(-1))
         loss_matrix.append(loss.view(1,-1))
@@ -83,30 +82,32 @@ def evaluate(rnn, input, mask, target, criterion):
     # return total oss
     return lossPerDay, loss.item()
 
-def validate(rnn, batches):
+def validate(rnn, test_iter):
     current_loss = 0
     lossPerDays = []
     lossPerDays_avg = []
-    n_batches = len(batches)
+
     rnn.eval()
-    with torch.no_grad(): 
-        for i in range(0, n_batches):
-            input, mask, target = getBatch(batches,i)
-            
-            if (input.size(0)-1)==0: continue
-            
-            lossPerDay, loss = evaluate(rnn, input, mask, target, criterion)
+    with torch.no_grad():
+        iloop =0  
+        for input, target, mask, eof in test_iter:
             #import pdb; pdb.set_trace()
 
+            input = torch.tensor(input).type(torch.float32).to(device)
+            target = torch.tensor(target).type(torch.LongTensor).to(device)
+            mask = torch.tensor(mask).type(torch.float32).to(device)
+ 
+            lossPerDay, loss = evaluate(rnn, input, mask, target, criterion)
             lossPerDays.append(lossPerDay[:7]) #n_batches * 10
             current_loss += loss
-            #lossPerDay += torch.sum(lossPerDay)
-        #import pdb; pdb.set_trace()
+            iloop+=1
         lossPerDays = torch.stack(lossPerDays)
         lossPerDays_avg = lossPerDays.sum(dim =0)
-        
-        lossPerDays_avg = lossPerDays_avg/n_batches
-    return lossPerDays_avg, current_loss / n_batches, 
+
+            
+        lossPerDays_avg = lossPerDays_avg/iloop
+        current_loss = current_loss/iloop
+    return lossPerDays_avg, current_loss 
 
 def timeSince(since):
     now = time.time()
@@ -117,13 +118,9 @@ def timeSince(since):
 
 if __name__ == "__main__":
     # prepare data
-    np_data, np_labels, np_vdata, np_vlabels = prepareData()
-    batch_size = args.batch_size #TODO: batchsize and seq_len is the issue to be addressed
+    batch_size = args.batch_size 
     n_epoches = args.max_epochs 
 
-    batches = batchify(np_data, batch_size, np_labels)
-    vbatches = batchify(np_vdata, batch_size, np_vlabels) 
- 
     device = torch.device("cuda")     
 
     # setup model
@@ -144,45 +141,45 @@ if __name__ == "__main__":
     all_losses = []
 
     start = time.time()
-    n_batches = len(batches)
 
     patience = 5    
     savePath = args.savePath
    
 
-    train_path = ""
-    train_iter = (train_path, batch_size)
+    train_path = "../data/dummy/classification_train.csv"
+    test_path = "../data/dummy/classification_test.csv"
+    train_iter = FSIterator(train_path, batch_size)
 
     
     for ei in range(args.max_epochs):
         bad_counter = 0
         best_loss = -1.0
-
-        for i in range(0, n_batches): #TODO for debugging
-            input, mask, target = getBatch(batches,i)
-
-            if input.size(0) - 1 == 0: # single-day data
-                continue
+        
+        iloop =0 
+        for input,target, mask, eof in train_iter: #TODO for debugging
+            #import pdb; pdb.set_trace() 
+            input = torch.tensor(input).type(torch.float32).to(device)
+            target = torch.tensor(target).type(torch.LongTensor).to(device)
+            mask = torch.tensor(mask).type(torch.float32).to(device)
 
             output, loss = train(rnn, input, mask, target, optimizer, criterion)
             current_loss += loss
 
-            # print iter number, loss, prediction, and target
-            #if i ==102:
-            #    break
-            if (i+1) % print_every == 0:
+            if (iloop+1) % print_every == 0:
                 top_n, top_i = output.topk(1)
                 #correct = 'correct' if top_i[0].item() == target[0].item() else 'wrong'
                 # print minibatch, ongoing pecentage, time, currnet loss for minibatch
-                print("%d %d%% (%s) %.4f" % (i+1, (i+1) / n_batches * 100, timeSince(start), current_loss/print_every))
+                print("%d  (%s) %.4f" % (iloop+1,timeSince(start), current_loss/print_every))
                 all_losses.append(current_loss / print_every)
 
                 current_loss=0
+            
+            iloop+=1
 
 
-        '''after one epoch, Test start'''
-
-        lossPerDays, valid_loss = validate(rnn, vbatches)
+    
+        test_iter = FSIterator(test_path, args.batch_size, 1)
+        lossPerDays, valid_loss = validate(rnn, test_iter)
         print("valid loss : {}".format(valid_loss))
         print(lossPerDays)
         if valid_loss < best_loss or best_loss < 0:
