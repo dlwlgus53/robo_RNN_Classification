@@ -17,8 +17,6 @@ import argparse
 
 #from data import prepareData, batchify
 from data2 import FSIterator
-from sklearn.metrics import f1_score
-
 
 parser = argparse.ArgumentParser()
 
@@ -32,18 +30,21 @@ args = parser.parse_args()
 def train(rnn, input, mask, target, optimizer, criterion):
     rnn = rnn.train()
     loss_matrix = []
-    #hidden = rnn.initHidden().to(device)
-    #hidden = (hidden[0],hidden[1])
     
     optimizer.zero_grad()
     
-    output, hidden = rnn(input)
+    #input = input.unsqueeze(-1) # depricated after addDelta()
     
-    for t in range(input.size(0)):   
-        loss = criterion(output[t].view(args.batch_size,-1), target.view(-1))
+    for t in range(input.size(0) - 1):
+        output, hidden = rnn(input[t])
+        loss = criterion(output.view(args.batch_size,-1), target.view(-1))
         loss_matrix.append(loss.view(1,-1))
     
+
+    #output, hidden = rnn(input, hidden)
+    import pdb; pdb.set_trace() 
     loss_matrix = torch.cat(loss_matrix, dim=0)
+    mask = mask[:(input.size(0) - 1), :]
     
     masked = loss_matrix * mask
     
@@ -53,89 +54,58 @@ def train(rnn, input, mask, target, optimizer, criterion):
     
     optimizer.step()
 
-    return loss.item()
+    return output, loss.item()
 
 def evaluate(rnn, input, mask, target, criterion):
     rnn = rnn.eval()
     loss_matrix = []
-    
-    output, hidden = rnn(input)
 
-    for t in range(input.size(0)):
-        loss = criterion(output[t].view(args.batch_size,-1), target.view(-1))
+    hidden = rnn.initHidden().to(device)
+    hidden = (hidden[0], hidden[1]) #???
+
+    #input = input.unsqueeze(-1) #deprecated after using addDelta()
+    
+    for t in range(input.size(0)- 1):
+        output, hidden = rnn(input[t], hidden)
+        loss = criterion(output.view(args.batch_size,-1), target.view(-1))
         loss_matrix.append(loss.view(1,-1))
 
     loss_matrix = torch.cat(loss_matrix, dim=0)
-
-    masked = loss_matrix * mask
-
+    mask = mask[:(input.size(0) - 1), :]
+    
+    masked = loss_matrix * mask #daylen * batch_size
     lossPerDay = torch.sum(masked, dim = 1)/torch.sum(mask, dim=1 ) #1*daylen
     loss = torch.sum(masked) / torch.sum(mask)
-    
-    acc_matrix = []
-    f1_matrix = []
-
-    for t in range(input.size(0)):
-        result = torch.max(output[t].data, 1)[1]
-        accuracy = (target.squeeze() == result)
-        acc_matrix.append((accuracy).view(1,-1))
-    
-    
-    
-
-    acc_matrix = torch.cat(acc_matrix, dim=0)
-
-    masked_acc = acc_matrix * mask
-    accPerDay = torch.sum(masked_acc, dim =1)/torch.sum(mask, dim=1)
-    accuracy = torch.sum(masked_acc)/torch.sum(mask)
-    
-  
-    return  accPerDay, accuracy.item(), lossPerDay, loss.item()
+    # retrun masked raw loss matrix for checking loss per day
+    # return total oss
+    return lossPerDay, loss.item()
 
 def validate(rnn, test_iter):
     current_loss = 0
-    current_acc =0 
     lossPerDays = []
-    accPerDays = []
-    f1PerDays = []
     lossPerDays_avg = []
-    accPerDays_avg = []
-    f1PerDays_avg = []
 
     rnn.eval()
     with torch.no_grad():
         iloop =0  
         for input, target, mask, eof in test_iter:
+            #import pdb; pdb.set_trace()
 
             input = torch.tensor(input).type(torch.float32).to(device)
             target = torch.tensor(target).type(torch.LongTensor).to(device)
             mask = torch.tensor(mask).type(torch.float32).to(device)
  
-            accPerDay, acc, lossPerDay, loss = evaluate(rnn, input, mask, target, criterion)
+            lossPerDay, loss = evaluate(rnn, input, mask, target, criterion)
             lossPerDays.append(lossPerDay[:7]) #n_batches * 10
-            accPerDays.append(accPerDay[:7])
-            f1PerDays.append(f1PerDay[:7])
-            current_acc += acc
             current_loss += loss
             iloop+=1
-
         lossPerDays = torch.stack(lossPerDays)
         lossPerDays_avg = lossPerDays.sum(dim =0)
-        
-        accPerDays = torch.stack(accPerDays)
-        accPerDays_avg = accPerDays.sum(dim = 0)
-
-
-
 
             
         lossPerDays_avg = lossPerDays_avg/iloop
-        accPerDays_avg = accPerDays_avg/iloop
-
-        current_acc = current_acc/iloop
         current_loss = current_loss/iloop
-    
-    return  accPerDays_avg, current_acc, lossPerDays_avg, current_loss 
+    return lossPerDays_avg, current_loss 
 
 def timeSince(since):
     now = time.time()
@@ -185,15 +155,16 @@ if __name__ == "__main__":
         
         iloop =0 
         for input,target, mask, eof in train_iter: #TODO for debugging
+            #import pdb; pdb.set_trace() 
             input = torch.tensor(input).type(torch.float32).to(device)
             target = torch.tensor(target).type(torch.LongTensor).to(device)
             mask = torch.tensor(mask).type(torch.float32).to(device)
-            rnn =rnn.to(device)
-            loss = train(rnn, input, mask, target, optimizer, criterion)
+
+            output, loss = train(rnn, input, mask, target, optimizer, criterion)
             current_loss += loss
 
             if (iloop+1) % print_every == 0:
-                #top_n, top_i = output.topk(1)
+                top_n, top_i = output.topk(1)
                 #correct = 'correct' if top_i[0].item() == target[0].item() else 'wrong'
                 # print minibatch, ongoing pecentage, time, currnet loss for minibatch
                 print("%d  (%s) %.4f" % (iloop+1,timeSince(start), current_loss/print_every))
@@ -204,14 +175,11 @@ if __name__ == "__main__":
             iloop+=1
 
 
-        
+    
         test_iter = FSIterator(test_path, args.batch_size, 1)
-
-        accPerDays, valid_acc, lossPerDays, valid_loss = validate(rnn, test_iter)
+        lossPerDays, valid_loss = validate(rnn, test_iter)
         print("valid loss : {}".format(valid_loss))
         print(lossPerDays)
-        print(accPerDays)
-        print(valid_acc)
         if valid_loss < best_loss or best_loss < 0:
             bad_counter = 0
             torch.save(rnn, savePath)
@@ -229,4 +197,3 @@ if __name__ == "__main__":
 
     plt.plot(all_losses)
     plt.savefig(args.savePath + ".png")
-

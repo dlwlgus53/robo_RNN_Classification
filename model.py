@@ -37,10 +37,14 @@ class RNN(nn.Module):
         self.batch_size = batch_size
         self.hidden_size = hidden_size
 
-    def forward(self, input, hidden):
-        #import pdb; pdb.set_trace()
+    #def forward(self, input, hidden):
+        
+    def forward(self, input):
+        '''
         input = input.unsqueeze(0)
-        #TODO
+        '''
+        hidden = self.initHidden()
+        hidden = (hidden[0],hidden[1])
         output, hidden = self.rnn(input, hidden)
                 
         output = self.fc(output)
@@ -49,4 +53,4 @@ class RNN(nn.Module):
         return output, hidden
 
     def initHidden(self):
-        return torch.zeros(2, 1, self.batch_size, self.hidden_size)
+        return torch.zeros(2, 1, self.batch_size, self.hidden_size).to('cuda')
