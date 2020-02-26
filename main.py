@@ -1,7 +1,7 @@
 '''
 adopted from pytorch.org (Classifying names with a character-level RNN-Sean Robertson)
 '''
-
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -22,10 +22,19 @@ from sklearn.metrics import f1_score
 
 parser = argparse.ArgumentParser()
 
+
+parser.add_argument('--saveModel', type=str, default = "bestmodel", help='')
+parser.add_argument('--savePath', type=str, default = "png", help='')
+parser.add_argument('--fileName', type=str, default="RMSprop0.001", help='')
+parser.add_argument('--max_epochs', type=int, default=10, help='')
 parser.add_argument('--batch_size', type=int, default=8, help='')
 parser.add_argument('--hidden_size', type=int, default=8, help='')
-parser.add_argument('--savePath', type=str, required=True, help='')
-parser.add_argument('--max_epochs', type=int, default=2, help='')
+parser.add_argument('--saveDir', type=str, default="png", help='')
+parser.add_argument('--patience', type = int, default = 3, help='')
+parser.add_argument('--daytolook', type = int, default = 7, help='')
+parser.add_argument('--optim', type=str, default="RMSprop")# Adam, SGD, RMSprop
+parser.add_argument('--lr', type=float, metavar='LR', default=0.001,
+                    help='learning rate (no default)')
 
 args = parser.parse_args()
 
@@ -34,7 +43,7 @@ def train(rnn, input, mask, target, optimizer, criterion):
     loss_matrix = []
     #hidden = rnn.initHidden().to(device)
     #hidden = (hidden[0],hidden[1])
-    
+    day = args.daytolook
     optimizer.zero_grad()
     
     output, hidden = rnn(input)
@@ -58,7 +67,7 @@ def train(rnn, input, mask, target, optimizer, criterion):
 def evaluate(rnn, input, mask, target, criterion):
     rnn = rnn.eval()
     loss_matrix = []
-    
+    daylen = args.daytolook
     output, hidden = rnn(input)
 
     for t in range(input.size(0)):
@@ -68,9 +77,8 @@ def evaluate(rnn, input, mask, target, criterion):
     loss_matrix = torch.cat(loss_matrix, dim=0)
 
     masked = loss_matrix * mask
-
     lossPerDay = torch.sum(masked, dim = 1)/torch.sum(mask, dim=1 ) #1*daylen
-    loss = torch.sum(masked) / torch.sum(mask)
+    loss = torch.sum(masked[:daylen]) / torch.sum(mask[:daylen])
     
     acc_matrix = []
     f1_matrix = []
@@ -87,7 +95,7 @@ def evaluate(rnn, input, mask, target, criterion):
 
     masked_acc = acc_matrix * mask
     accPerDay = torch.sum(masked_acc, dim =1)/torch.sum(mask, dim=1)
-    accuracy = torch.sum(masked_acc)/torch.sum(mask)
+    accuracy = torch.sum(masked_acc[:daylen])/torch.sum(mask[:daylen])
     
   
     return  accPerDay, accuracy.item(), lossPerDay, loss.item()
@@ -103,6 +111,8 @@ def validate(rnn, test_iter):
     f1PerDays_avg = []
 
     rnn.eval()
+
+    daylen = args.daytolook
     with torch.no_grad():
         iloop =0  
         for input, target, mask, eof in test_iter:
@@ -112,9 +122,8 @@ def validate(rnn, test_iter):
             mask = torch.tensor(mask).type(torch.float32).to(device)
  
             accPerDay, acc, lossPerDay, loss = evaluate(rnn, input, mask, target, criterion)
-            lossPerDays.append(lossPerDay[:7]) #n_batches * 10
-            accPerDays.append(accPerDay[:7])
-            f1PerDays.append(f1PerDay[:7])
+            lossPerDays.append(lossPerDay[:daylen]) #n_batches * 10
+            accPerDays.append(accPerDay[:daylen])
             current_acc += acc
             current_loss += loss
             iloop+=1
@@ -124,11 +133,7 @@ def validate(rnn, test_iter):
         
         accPerDays = torch.stack(accPerDays)
         accPerDays_avg = accPerDays.sum(dim = 0)
-
-
-
-
-            
+    
         lossPerDays_avg = lossPerDays_avg/iloop
         accPerDays_avg = accPerDays_avg/iloop
 
@@ -162,15 +167,17 @@ if __name__ == "__main__":
 
     # define loss
     criterion = nn.NLLLoss(reduction='none')
-    optimizer = optim.RMSprop(rnn.parameters())
     
-    print_every = 100 #print every minibatch
+    optimizer = "optim." + args.optim
+    optimizer = eval(optimizer)(rnn.parameters(), lr=args.lr)
+ 
+    print_every = 1000 #print every minibatch
     current_loss = 0
     all_losses = []
 
     start = time.time()
 
-    patience = 5    
+    patience = args.patience 
     savePath = args.savePath
    
 
@@ -188,14 +195,10 @@ if __name__ == "__main__":
             input = torch.tensor(input).type(torch.float32).to(device)
             target = torch.tensor(target).type(torch.LongTensor).to(device)
             mask = torch.tensor(mask).type(torch.float32).to(device)
-            rnn =rnn.to(device)
             loss = train(rnn, input, mask, target, optimizer, criterion)
             current_loss += loss
 
             if (iloop+1) % print_every == 0:
-                #top_n, top_i = output.topk(1)
-                #correct = 'correct' if top_i[0].item() == target[0].item() else 'wrong'
-                # print minibatch, ongoing pecentage, time, currnet loss for minibatch
                 print("%d  (%s) %.4f" % (iloop+1,timeSince(start), current_loss/print_every))
                 all_losses.append(current_loss / print_every)
 
@@ -209,12 +212,13 @@ if __name__ == "__main__":
 
         accPerDays, valid_acc, lossPerDays, valid_loss = validate(rnn, test_iter)
         print("valid loss : {}".format(valid_loss))
-        print(lossPerDays)
-        print(accPerDays)
+        print(lossPerDays.tolist())
+        print(accPerDays.tolist())
         print(valid_acc)
         if valid_loss < best_loss or best_loss < 0:
+            print("find best")
             bad_counter = 0
-            torch.save(rnn, savePath)
+            torch.save(rnn, args.saveModel)
 
         else:
             bad_counter += 1
@@ -227,6 +231,7 @@ if __name__ == "__main__":
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
-    plt.plot(all_losses)
-    plt.savefig(args.savePath + ".png")
+    save_path = os.path.join("./", args.saveDir) 
+    plt.plot(accPerDays.tolist())
+    plt.savefig(savePath + "/" + args.fileName + ".png")
 
