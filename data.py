@@ -1,136 +1,127 @@
-'''
-adopted from pytorch.org (Classifying names with a character-level RNN-Sean Robertson)
-'''
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
-
-import pandas as pd
 import numpy as np
+import torch
 
-import math
-import sys
-import time
+class FSIterator:
+    def __init__(self, filename, batch_size=32, just_epoch=False):
+        self.batch_size = batch_size
+        self.just_epoch = just_epoch
+        self.fp = open(filename, 'r')
 
-def remove_wrong_data(data):
-    cleans = []
-    for n in range(data.shape[0]):
-        if np.isnan(data[n,0:2]).any():
-            continue
-        cleans.append(data[n,:-2])
-    return np.vstack(cleans)
+    def __iter__(self):
+        return self
 
-def remove_short_data(data):
-    enough = []
-    #import pdb; pdb.set_trace()
-    for n in range(data.shape[0]):
-        if(np.count_nonzero(~np.isnan(data[n])) < 15): #TODO hardcoding
-            continue
-        enough.append(data[n])
-    return np.vstack(enough)
-    
-def getSeq_len(row):
-    '''
-    returns: count of non-nans (integer)
-    adopted from: M4rtni's answer in stackexchange
-    '''
-    return np.count_nonzero(~np.isnan(row))
+    def reset(self):
+        self.fp.seek(0)
 
-def getMask(batch):
-    
-    '''
-    returns: boolean array indicating whether nans  
-    '''
-    return (~np.isnan(batch)).astype(np.int32)
+    def __next__(self):
+        bat_seq = []
+        touch_end = 0
 
-def trimBatch(batch):
-    '''
-    args: npndarray of a batch (bsz, n_features)
-    returns: trimmed npndarray of a batch.
-    '''
-    max_seq_len = 0
-    for n in range(batch.shape[0]):
-        max_seq_len = max(max_seq_len, getSeq_len(batch[n]))
+        for i in range(self.batch_size):
+            seq = self.fp.readline()
+            if touch_end:
+                raise StopIteration
 
-    if max_seq_len == 0:
-        print("error in trimBatch()")
-        sys.exit(-1)
+            if seq == "":
+                touch_end = 1
+                
+                '''
+                if self.just_epoch:
+                    end_of_data = 1
+                    if self.batch_size==1:
+                        raise StopIteration
+                    else:
+                        break
+                '''
+                self.reset()
+                seq = self.fp.readline() # read the first line
 
-    batch = batch[:,:max_seq_len]
-    return batch
+            seq_f = [float(s) for s in seq.split(',')]
+            bat_seq.append(seq_f)
 
-def addPadding(data):
-    '''
-    args: 2D npndarray with nans
-    returns npndarray with nans padded with 0's
-    '''
-    for n in range(data.shape[0]):
-        for i in range(data.shape[1]):
-            if np.isnan(data[n,i]): data[n,i] = 0
-    return data
-
-def getDelta(col_prev, col): # helper for addDelta()
-    delta = (col - col_prev).reshape(-1,1)
-
-    return np.hstack([col, delta])
-
-def addDelta(batch):
-    timesteps = []
-    # treat first column
-    delta = np.zeros((batch.shape[0],2))
-    timesteps.append(delta)
-
-    # tread the rest
-    for i in range(1, batch.shape[1]):
-        timesteps.append(getDelta(batch[:,i-1].reshape(-1,1), batch[:,i].reshape(-1,1)))
-
-    samples = np.stack(timesteps)
-
-    return samples
-
-def batchify(data, bsz, labels):
-    batches = []
-    
-    n_samples = data.shape[0]
-    for n in range(0, n_samples, bsz):
-        if n+bsz > n_samples: #discard remainder #TODO: use remainders somehow
-            break
-        batch = data[n:n+bsz]
-        target = labels[n:n+bsz]
-
-        batch = trimBatch(batch)
-        mask = getMask(batch)
+        x_data, y_data, mask_data = self.prepare_data(np.array(bat_seq))
         
-        batch = addPadding(batch)
+        device = torch.device("cuda")
+        x_data = torch.tensor(x_data).type(torch.float32).to(device)
+        y_data = torch.tensor(y_data).type(torch.LongTensor).to(device)
+        mask_data = torch.tensor(mask_data).type(torch.float32).to(device)
 
-        batch = addDelta(batch)
-        mask = mask.transpose()
+        return x_data, y_data, mask_data
 
-        batches.append([batch, mask, target])
+    def getSeq_len(self,row):
+        '''                                                                                                                                 
+        returns: count of non-nans (integer)
+        adopted from: M4rtni's answer in stackexchange
+        '''
+        return np.count_nonzero(~np.isnan(row))
 
-    return batches
 
-def prepareData():
-    df_train = pd.read_csv("../data/dummy/classification_train.csv")
-    df_valid = pd.read_csv("../data/dummy/classification_test.csv")
-    np_train = np.asarray(df_train)
-    np_valid = np.asarray(df_valid)
+    def getMask(self,batch):
+        '''
+        returns: boolean array indicating whether nans
+        '''
+        return (~np.isnan(batch)).astype(np.int32)
+
+    def trimBatch(self,batch):
+        '''
+        args: npndarray of a batch (bsz, n_features)
+        returns: trimmed npndarray of a batch.
+        '''
+        max_seq_len = 0
+        for n in range(batch.shape[0]):
+            max_seq_len = max(max_seq_len, self.getSeq_len(batch[n]))
+
+        if max_seq_len == 0:
+            print("error in trimBatch()")
+            sys.exit(-1)
+
+        batch = batch[:,:max_seq_len]
+        return batch
+
     
-    np_train = remove_short_data(np_train)
-    np_valid = remove_short_data(np_valid)
+    def prepare_data(self, seq):
+        PRE_STEP = 1 # this is for delta
+        #iimport pdb; pdb.set_trace()
+        seq_x = seq[:,:-1]
+        seq_y = seq[:,-1]
+        
+        seq_x = self.trimBatch(seq_x)
+        seq_mask = self.getMask(seq_x[:,1:-PRE_STEP])
+        seq_x = np.nan_to_num(seq_x)
 
-    np_data = np_train[:,:-1]
-    np_labels = np_train[:,-1].reshape(-1,1)
-    
-    np_vdata = np_valid[:,:-1]
-    np_vlabels = np_valid[:,-1].reshape(-1,1)
+        seq_x_delta = seq_x[:,1:] - seq_x[:,:-1]
 
-    
-    return np_data, np_labels, np_vdata, np_vlabels
+
+        x_data = np.stack([seq_x[:,1:-PRE_STEP], seq_x_delta[:,:-PRE_STEP] ], axis=2)#batch * daylen * inputdim(2)
+        x_data = x_data.transpose(1,0,2)# daylen * batch * inputdim
+        
+        y_data = seq_y.reshape(1,-1) # batch * 1
+        y_data = np.stack([y_data.transpose(1,0)])# 1*batch*1
+
+        #y_data = (seq_delta[:,1:] > 0)*1.0 # the diff
+        
+        mask_data = np.stack(seq_mask.transpose(1,0))
+        '''
+        x_data : daymaxlen-2, batch, inputdim(=2)
+        y_data : 1 * batch * 1
+        mask_data : 1*daymaxlen-2, batch
+        '''
+        return x_data, y_data, mask_data
 
 if __name__ == "__main__":
-    a, b, c, d = prepareData()
+    import os
+    import numpy as np
 
-    batches = batchify(a, 4, b)
-    print(batches[0])
+    #filename = os.environ['HOME']+'/FinSet/data/GM.csv.seq.shuf'
+    filename = "../data/dummy/classification_train.csv"
+    #df_train = pd.read_csv("../data/dummy/classification_train.csv")
+    bs = 4
+    train_iter = FSIterator(filename, batch_size=bs, just_epoch=True)
+
+    i = 0
+    for tr_x, tr_y, tr_m, end_of_data in train_iter:
+        print(i, tr_x, tr_y, tr_m)
+        i = i + 1
+        if i > 2:
+            break
+                    
