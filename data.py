@@ -17,14 +17,14 @@ class FSIterator:
         bat_seq = []
         touch_end = 0
 
-        for i in range(self.batch_size):
+        while(len(bat_seq)< self.batch_size):
             seq = self.fp.readline()
             if touch_end:
                 raise StopIteration
 
             if seq == "":
                 touch_end = 1
-                
+
                 '''
                 if self.just_epoch:
                     end_of_data = 1
@@ -37,7 +37,8 @@ class FSIterator:
                 seq = self.fp.readline() # read the first line
 
             seq_f = [float(s) for s in seq.split(',')]
-            bat_seq.append(seq_f)
+            if(np.count_nonzero(~np.isnan(seq_f))>10): #TODO remove sh
+                bat_seq.append(seq_f)
 
         x_data, y_data, mask_data = self.prepare_data(np.array(bat_seq))
         

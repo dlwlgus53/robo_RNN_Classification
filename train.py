@@ -24,7 +24,7 @@ def train_main(args, model, train_path, criterion, optimizer):
             print("%d %.4f" % (iloop+1, current_loss/args.logInterval))
             all_losses.append(current_loss /args.logInterval)
             current_loss=0
-            break
+            
 
         iloop+=1
 
