@@ -9,7 +9,7 @@ from data import FSIterator
 import numpy as np
 import pandas as pd
 
-from sklearn.metrics import recall_score
+from sklearn.metrics import recall_score, f1_score, precision_score
 
 
 def train_main(args, model, train_path, criterion, optimizer):
@@ -60,6 +60,8 @@ def evaluate(args, model, input, mask, target, criterion):
     loss_matrix = []
     acc_matrix = []
     recall_matrix = []
+    f1_matrix = []
+    precision_matrix = []
 
     daylen = args.daytolook
     output, hidden = model(input)
@@ -91,11 +93,15 @@ def evaluate(args, model, input, mask, target, criterion):
     accuracy = torch.sum(masked_acc[:daylen])/torch.sum(mask[:daylen])
     
     '''Part of recall'''
-    import pdb; pdb.set_trace()
     for t in range(daylen):
         result = torch.max(output[t].data,1)[1]
         recall = recall_score(target.squeeze().cpu(), result.cpu())
+        precision = precision_score(target.squeeze().cpu(), result.cpu())
+        f1 = f1_score(target.squeeze().cpu(), result.cpu())
+
         recall_matrix.append(recall)
+        precision_matrix.append(precision)
+        f1_matrix.append(f1)
 
     #recall_matirx = torch.cat(recall_matrix, dim=0)
 
@@ -103,7 +109,7 @@ def evaluate(args, model, input, mask, target, criterion):
         
     
 
-    return  recall_matrix, accPerDay, accuracy.item(), lossPerDay, loss.item()
+    return  f1_matrix, precision_matrix, recall_matrix, accPerDay, accuracy.item(), lossPerDay, loss.item()
 
 
 
@@ -120,11 +126,14 @@ def test(args, model, test_path, criterion):
     lossPerDays = []
     accPerDays = []
     recallPerDays = []
-    
+    precisionPerDays = []
+    f1PerDays = []
+
     lossPerDays_avg = []
     accPerDays_avg = []
-    recallPerDays_Avg = []
-
+    recallPerDays_avg = []
+    precisionPerDays_avg = []
+    f1PerDays_avg = []
 
     model.eval()
 
@@ -134,10 +143,12 @@ def test(args, model, test_path, criterion):
         test_iter = FSIterator(test_path, args.batch_size, 1)
         for input, target, mask in test_iter:
 
-            recallPerDay, accPerDay, acc, lossPerDay, loss = evaluate(args, model, input, mask, target, criterion)
+            f1PerDay, precisionPerDay, recallPerDay, accPerDay, acc, lossPerDay, loss = evaluate(args, model, input, mask, target, criterion)
             lossPerDays.append(lossPerDay[:daylen]) #n_batches * 10
             accPerDays.append(accPerDay[:daylen])
             recallPerDays.append(recallPerDay)
+            precisionPerDays.append(precisionPerDay)
+            f1PerDays.append(f1PerDay)
 
             current_acc += acc
             current_loss += loss
@@ -149,14 +160,16 @@ def test(args, model, test_path, criterion):
         accPerDays = torch.stack(accPerDays)
         accPerDays_avg = (accPerDays.sum(dim = 0))/iloop
 
-        import pdb; pdb.set_trace()
         #recallPerDays = torch.stack(recallPerDays)
-        recallPerDays_avg = recallPerDays.sum(dim=0)/iloop
-
+        recallPerDays_avg = torch.FloatTensor(recallPerDays).sum(dim=0)/iloop
+        precisionPerDays_avg = torch.FloatTensor(precisionPerDays).sum(dim=0)/iloop
+        f1PerDays_avg = torch.FloatTensor(f1PerDays).sum(dim=0)/iloop
+        
+        
         #lossPerDays_avg = lossPerDays_avg/iloop
         #accPerDays_avg = accPerDays_avg/iloop
 
         current_acc = current_acc/iloop
         current_loss = current_loss/iloop
 
-    return  recallPerDays_avg, accPerDays_avg, current_acc, lossPerDays_avg, current_loss
+    return  precisionPerDays_avg, f1PerDays_avg, recallPerDays_avg, accPerDays_avg, current_acc, lossPerDays_avg, current_loss
