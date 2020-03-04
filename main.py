@@ -91,12 +91,14 @@ if __name__ == "__main__":
         best_loss = -1.0
         
         train_main(args, model, train_path, criterion, optimizer)
-        accPerDays, valid_acc, lossPerDays, valid_loss = test(args, model, test_path, criterion)
+        recallPerDays, accPerDays, valid_acc, lossPerDays, valid_loss = test(args, model, test_path, criterion)
         
         print("valid loss : {}".format(valid_loss))
         print(lossPerDays.tolist())
         print(accPerDays.tolist())
         print(valid_acc)
+        print("recall")
+        print(recallPerDays)
         if valid_loss < best_loss or best_loss < 0:
             print("find best")
             bad_counter = 0
