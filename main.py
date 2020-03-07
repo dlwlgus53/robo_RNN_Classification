@@ -28,15 +28,15 @@ parser.add_argument('--logInterval', type=int, default=100, help='')
 parser.add_argument('--saveModel', type=str, default = "bestmodel", help='')
 parser.add_argument('--savePath', type=str, default = "png", help='')
 parser.add_argument('--fileName', type=str, default="RMSprop0.001", help='')
-parser.add_argument('--max_epochs', type=int, default=8, help='')
+parser.add_argument('--max_epochs', type=int, default=8, help='')#TODO
 parser.add_argument('--batch_size', type=int, default=32, help='')
-parser.add_argument('--hidden_size', type=int, default=8, help='')
+parser.add_argument('--hidden_size', type=int, default=32, help='')#TODO
 parser.add_argument('--saveDir', type=str, default="png", help='')
-parser.add_argument('--patience', type = int, default = 3, help='')
-parser.add_argument('--daytolook', type = int, default = 7, help='')
-parser.add_argument('--optim', type=str, default="RMSprop")# Adam, SGD, RMSprop
+parser.add_argument('--patience', type = int, default = 3, help='')#TODO
+parser.add_argument('--daytolook', type = int, default = 4, help='')
+parser.add_argument('--optim', type=str, default="Adam")# TODO Adam, SGD, RMSprop
 parser.add_argument('--lr', type=float, metavar='LR', default=0.001,
-                    help='learning rate (no default)')
+                    help='learning rate (no default)')#TODO
 
 args = parser.parse_args()
 
@@ -94,9 +94,11 @@ if __name__ == "__main__":
         precision, f1, recallPerDays, accPerDays, valid_acc, lossPerDays, valid_loss = test(args, model, test_path, criterion)
         
         print("valid loss : {}".format(valid_loss))
-        print(lossPerDays.tolist())
+        #print(lossPerDays.tolist())
+        #print(accPerDays.tolist())
+        #print(valid_acc)
+        print("accuracy")
         print(accPerDays.tolist())
-        print(valid_acc)
         print("recall")
         print(recallPerDays)
         print("f1")

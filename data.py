@@ -23,6 +23,7 @@ class FSIterator:
                 raise StopIteration
 
             if seq == "":
+                print("touch end")
                 touch_end = 1
 
                 '''
@@ -37,8 +38,9 @@ class FSIterator:
                 seq = self.fp.readline() # read the first line
 
             seq_f = [float(s) for s in seq.split(',')]
-            if(np.count_nonzero(~np.isnan(seq_f))>10): #TODO remove sh
-                bat_seq.append(seq_f)
+            if(np.count_nonzero(~np.isnan(seq_f))<=10):
+                if(np.count_nonzero(~np.isnan(seq_f))>4):# TODO 
+                    bat_seq.append(seq_f)
 
         x_data, y_data, mask_data = self.prepare_data(np.array(bat_seq))
         

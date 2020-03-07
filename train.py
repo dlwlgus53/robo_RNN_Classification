@@ -39,6 +39,7 @@ def train(args, model, input, mask, target, optimizer, criterion):
     output, hidden = model(input)
     
     for t in range(input.size(0)):
+        #import pdb; pdb.set_trace()
         loss = criterion(output[t].view(args.batch_size,-1), target.view(-1))
         loss_matrix.append(loss.view(1,-1))
 
@@ -153,7 +154,8 @@ def test(args, model, test_path, criterion):
             current_acc += acc
             current_loss += loss
             iloop+=1
-
+        
+        
         lossPerDays = torch.stack(lossPerDays)
         lossPerDays_avg = (lossPerDays.sum(dim =0))/iloop
 
