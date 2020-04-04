@@ -33,9 +33,9 @@ parser.add_argument('--batch_size', type=int, default=32, help='')
 parser.add_argument('--hidden_size', type=int, default=32, help='')#TODO
 parser.add_argument('--saveDir', type=str, default="png", help='')
 parser.add_argument('--patience', type = int, default = 3, help='')#TODO
-parser.add_argument('--daytolook', type = int, default = 4, help='')
-parser.add_argument('--optim', type=str, default="Adam")# TODO Adam, SGD, RMSprop
-parser.add_argument('--lr', type=float, metavar='LR', default=0.001,
+parser.add_argument('--daytolook', type = int, default = 15, help='')
+parser.add_argument('--optim', type=str, default = "Adam")# TODO Adam, SGD, RMSprop
+parser.add_argument('--lr', type=float, metavar='LR', default=0.01,
                     help='learning rate (no default)')#TODO
 
 args = parser.parse_args()
@@ -59,12 +59,13 @@ if __name__ == "__main__":
 
     # setup model
 
-    input_size = 2
+    input_size = 10
     hidden_size = args.hidden_size
     output_size = 2
-    
+    print("Set model") 
     model = RNN(input_size, hidden_size, output_size, batch_size).to(device)
-
+    
+    print("Set loss and Optimizer")
     # define loss
     criterion = nn.NLLLoss(reduction='none')
     
@@ -82,21 +83,19 @@ if __name__ == "__main__":
     savePath = args.savePath
    
 
-    train_path = "../data/dummy/classification_train.csv"
-    test_path = "../data/dummy/classification_test.csv"
+    train_path = "../data/classification/train"
+    test_path = "../data/classification/test"
+    valid_path = "../data/classification/valid"
 
-    
+    print("Train start")
     for ei in range(args.max_epochs):
         bad_counter = 0
         best_loss = -1.0
         
         train_main(args, model, train_path, criterion, optimizer)
-        precision, f1, recallPerDays, accPerDays, valid_acc, lossPerDays, valid_loss = test(args, model, test_path, criterion)
+        precision, f1, recallPerDays, accPerDays, valid_acc, lossPerDays, valid_loss = test(args, model, valid_path, criterion)
         
         print("valid loss : {}".format(valid_loss))
-        #print(lossPerDays.tolist())
-        #print(accPerDays.tolist())
-        #print(valid_acc)
         print("accuracy")
         print(accPerDays.tolist())
         print("recall")
@@ -116,6 +115,19 @@ if __name__ == "__main__":
         if bad_counter > patience:
             print('Early Stopping')
             break
+
+    precision, f1, recallPerDays, accPerDays, valid_acc, lossPerDays, valid_loss = test(args, model, test_path, criterion)
+    print("accuracy ")
+    print(accPerDays.tolist())
+    print("Recall")
+    print(recallPerDays)
+    print("F1")
+    print(f1)
+    print("Precision")
+    print(precision)
+
+    
+    
          
     import matplotlib
     matplotlib.use('Agg')
