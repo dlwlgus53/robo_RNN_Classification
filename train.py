@@ -41,6 +41,7 @@ def train(args, model, input, mask, target, optimizer, criterion):
     for t in range(input.size(0)):
         #import pdb; pdb.set_trace()
         loss = criterion(output[t].view(args.batch_size,-1), target.view(-1))
+        #target.view() = [32]
         loss_matrix.append(loss.view(1,-1))
 
     loss_matrix = torch.cat(loss_matrix, dim=0)
@@ -62,7 +63,7 @@ def evaluate(args, model, input, mask, target, criterion):
     acc_matrix = []
     recall_matrix = []
     f1_matrix = []
-    precision_matrix = []
+    precision_atrix = []
 
     daylen = args.daytolook
     output, hidden = model(input)
@@ -136,7 +137,7 @@ def test(args, model, test_path, criterion):
     precisionPerDays_avg = []
     f1PerDays_avg = []
 
-    model.eval()
+    model = model.eval()
 
     daylen = args.daytolook
     with torch.no_grad():

@@ -1,0 +1,9 @@
+304,311d303
+< 
+< class PRUCell(PRU):
+<     def __init__(self, input_size, hidden_size, direction='f', batch_first=False, plus=False):
+<         """Initialize params."""
+<         super(PRUCell, self).__init__(input_size, hidden_size, direction, batch_first, plus)
+< 
+<     def forward(self, xt, htm, ctm, x_m=None):
+<         return self.step(xt, htm, ctm, x_m)

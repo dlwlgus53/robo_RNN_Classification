@@ -15,7 +15,7 @@ import sys
 import time
 
 import argparse
-
+from libs.layers import GaussianNoise
 from data import FSIterator
 from model import RNN
 from train import train_main, test
@@ -106,6 +106,7 @@ if __name__ == "__main__":
         print(precision)
         if valid_loss < best_loss or best_loss < 0:
             print("find best")
+            best_loss = valid_loss
             bad_counter = 0
             torch.save(model, args.saveModel)
 

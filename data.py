@@ -64,8 +64,9 @@ class FSIterator:
                 # and np.count_nonzero(~np.isnan(seq_end))< 21*/):
                 #if(np.count_nonzero(~np.isnan(seq_f))>4):
             if(sum(~np.isnan(seq_end)) == sum(~np.isnan(seq_start)) == sum(~np.isnan(seq_low))== sum(~np.isnan(seq_high)) == sum(~np.isnan(seq_trade))):
-                seqs = [seq_end, seq_start, seq_low, seq_high, seq_trade]
-                bat_seq.append(seqs)
+                if(max(seq_end)<=2):
+                    seqs = [seq_end, seq_start, seq_low, seq_high, seq_trade]
+                    bat_seq.append(seqs)
                 
         x_data, y_data, mask_data = self.prepare_data(np.array(bat_seq))#B x [[E*daylen],[S*daylen],[L*daylen],[H*daylen]]
         
